@@ -1,0 +1,97 @@
+//Update Database Command: 
+
+dotnet ef database update --project src/Infrastructure/Infrastructure.csproj --startup-project src/Web.Api/Web.Api.csproj
+
+//Rollback Database Command:
+dotnet ef database update <PreviousMigrationName> --project src/Infrastructure/Infrastructure.csproj --startup-project src/Web.Api/Web.Api.csproj
+
+
+
+
+//Create Migration Command:
+dotnet ef migrations add <MigrationName> --project src/Infrastructure/Infrastructure.csproj --startup-project src/Web.Api/Web.Api.csproj
+
+//remove recent migration
+dotnet ef migrations remove --project src/Infrastructure/Infrastructure.csproj --startup-project src/Web.Api/Web.Api.csproj
+
+
+
+
+// -------- meta GraphAPI ------- https://developers.facebook.com/tools/explorer/
+// create campaign
+
+{
+  "name": "Test Lead Campaign",
+  "objective": "OUTCOME_LEADS",
+  "status": "PAUSED",
+  "special_ad_categories": [],
+  "is_adset_budget_sharing_enabled": false,
+  "access_token": "<TOKEN>"
+}
+
+// create adset
+
+{
+  "name": "Test AdSet API 3",
+  "campaign_id": "120242659657270401",
+  "daily_budget": "100000",
+  "billing_event": "IMPRESSIONS",
+  "optimization_goal": "LEAD_GENERATION",
+  "bid_amount": "123",
+  "targeting": {
+    "geo_locations": {
+      "countries": [
+        "BD"
+      ]
+    }
+  },
+  "status": "PAUSED",
+  "access_token": "<TOKEN>"
+}
+
+// Create Form
+v25.0/PAGE_ID/leadgen_forms
+
+{
+  "name": "Test Lead Form API 4",
+  "locale": "en_US",
+  "privacy_policy": {
+    "url": "https://example.com/privacy",
+    "link_text": "Privacy Policy"
+  },
+  "questions": [
+    {
+      "type": "FULL_NAME"
+    },
+    {
+      "type": "EMAIL"
+    },
+    {
+      "type": "PHONE"
+    }
+  ],
+  "follow_up_action_url": "https://example.com/thank-you"
+}
+
+// Create test leads
+v25.0/PAGE_ID/test_leads
+
+
+
+
+// lead testing
+https://developers.facebook.com/tools/lead-ads-testing/
+
+
+
+
+
+
+AdAccount_id
+470126577111723
+
+Campaign_id
+120242659657270401
+
+form_id
+3536136206533659
