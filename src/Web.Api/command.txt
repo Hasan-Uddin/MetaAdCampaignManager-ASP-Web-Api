@@ -53,11 +53,13 @@ dotnet ef migrations remove --project src/Infrastructure/Infrastructure.csproj -
 v25.0/PAGE_ID/leadgen_forms
 
 {
-  "name": "Test Lead Form API 4",
+  "name": "Test Lead Form API 5",
   "locale": "en_US",
+  "follow_up_action_url": "http://go.com",
+  "privacy_policy_link_text": "http://fb.com",
   "privacy_policy": {
-    "url": "https://example.com/privacy",
-    "link_text": "Privacy Policy"
+    "url": "http://example.com",
+    "link_text": "bla bla bla"
   },
   "questions": [
     {
@@ -68,9 +70,12 @@ v25.0/PAGE_ID/leadgen_forms
     },
     {
       "type": "PHONE"
+    },
+    {
+      "label": "note",
+      "type": "CUSTOM"
     }
-  ],
-  "follow_up_action_url": "https://example.com/thank-you"
+  ]
 }
 
 // Create test leads
@@ -95,3 +100,14 @@ Campaign_id
 
 form_id
 3536136206533659
+
+
+
+====== Convert to Long-Lived User Token (60 Days) =============
+from https://developers.facebook.com/tools/debug/accesstoken/
+or 
+GET https://graph.facebook.com/v20.0/oauth/access_token?
+grant_type=fb_exchange_token&
+client_id=APP_ID&
+client_secret=APP_SECRET&
+fb_exchange_token=SHORT_LIVED_TOKEN
