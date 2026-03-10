@@ -1,31 +1,42 @@
+using System.Globalization;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using Application.Abstractions.Services.Meta;
 using Application.Features.Meta.Ads.Get;
 using Application.Features.Meta.AdSets.Get;
 using Application.Features.Meta.Campaigns.Get;
+using Application.Features.Meta.Forms;
+using Application.Features.Meta.Forms.Create;
 using Application.Features.Meta.Leads.Get;
+using Infrastructure.Services.Meta.DTOs;
+using Infrastructure.Services.Meta.Settings;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using SharedKernel;
-using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 
 namespace Infrastructure.Services.Meta;
 
 public sealed class MetaApiService(
     HttpClient httpClient,
-    IOptions<MetaApiOptions> options,
+    //IOptions<MetaApiOptions> options,
+    IMetaSettingsProvider settingsProvider,
     ILogger<MetaApiService> logger) : IMetaApiService
 {
-    private readonly MetaApiOptions _options = options.Value;
 
     public async Task<Result<List<CampaignResponse>>> GetCampaignsAsync(string adAccountId, CancellationToken ct = default)
     {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+        if (s.IsFailure)
+        {
+            return Result.Failure<List<CampaignResponse>>(s.Error);
+        }
+
         try
         {
             string url =
                 $"act_{adAccountId}/campaigns" +
-                $"?fields=id,name,status,objective,created_time" +
-                $"&access_token={_options.AccessToken}";
+                $"?fields=id,name,status,objective,created_time, updated_time," +
+                $"configured_status, buying_type, budget_remaining, can_use_spend_cap, is_skadnetwork_attribution" +
+                $"&access_token={s.Value.AccessToken}";
 
             logger.LogWarning("Meta API Request URL: {Url}", url);
 
@@ -47,7 +58,13 @@ public sealed class MetaApiService(
                 Name = c.Name,
                 Status = c.Status,
                 Objective = c.Objective ?? string.Empty,
-                CreatedAt = c.CreatedTime.UtcDateTime
+                ConfiguredStatus = c.ConfiguredStatus ?? string.Empty,
+                BuyingType = c.BuyingType ?? string.Empty,
+                BudgetRemaining = Convert.ToInt32(c.BudgetRemaining?? "0", CultureInfo.CurrentCulture),
+                CanUseSpendCap = c.CanUseSpendCap ?? false,
+                IsSkadnetworkAttribution = c.IsSkadnetworkAttribution ?? false,
+                CreatedAt = c.CreatedTime.UtcDateTime,
+                UpdatedAt = c.UpdatedTime.UtcDateTime
             }).ToList() ?? [];
         }
         catch (Exception ex)
@@ -59,9 +76,15 @@ public sealed class MetaApiService(
 
     public async Task<Result<List<AdSetResponse>>> GetAdSetsAsync(string campaignId, CancellationToken ct = default)
     {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+        if (s.IsFailure)
+        {
+            return Result.Failure<List<AdSetResponse>>(s.Error);
+        }
+
         try
         {
-            string url = $"{campaignId}/adsets?fields=id,name,status,campaign_id,created_time&access_token={_options.AccessToken}";
+            string url = $"{campaignId}/adsets?fields=id,name,status,campaign_id,created_time&access_token={s.Value.AccessToken}";
             MetaPaginatedResponse<MetaAdSet>? response = await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaAdSet>>(url, ct);
 
             return response?.Data.Select(a => new AdSetResponse
@@ -82,9 +105,15 @@ public sealed class MetaApiService(
 
     public async Task<Result<List<AdResponse>>> GetAdsAsync(string adSetId, CancellationToken ct = default)
     {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+        if (s.IsFailure)
+        {
+            return Result.Failure<List<AdResponse>>(s.Error);
+        }
+
         try
         {
-            string url = $"{adSetId}/ads?fields=id,name,status,adset_id,campaign_id,created_time&access_token={_options.AccessToken}";
+            string url = $"{adSetId}/ads?fields=id,name,status,adset_id,campaign_id,created_time&access_token={s.Value.AccessToken}";
             MetaPaginatedResponse<MetaAd>? response = await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaAd>>(url, ct);
 
             return response?.Data.Select(a => new AdResponse
@@ -106,9 +135,15 @@ public sealed class MetaApiService(
 
     public async Task<Result<List<LeadResponse>>> GetLeadsAsync(string formId, CancellationToken ct = default)
     {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+        if (s.IsFailure)
+        {
+            return Result.Failure<List<LeadResponse>>(s.Error);
+        }
+
         try
         {
-            string url = $"{formId}/leads?fields=id,ad_id,campaign_id,adset_id,created_time,field_data&access_token={_options.AccessToken}";
+            string url = $"{formId}/leads?fields=id,ad_id,campaign_id,adset_id,created_time,field_data&access_token={s.Value.AccessToken}";
             MetaPaginatedResponse<MetaLead>? response = await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaLead>>(url, ct);
 
             return response?.Data.Select(l => new LeadResponse
@@ -129,42 +164,182 @@ public sealed class MetaApiService(
         }
     }
 
+
+    public async Task<Result<List<FormResponse>>> GetFormsAsync(string pageId, CancellationToken ct = default)
+    {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+
+        if (s.IsFailure)
+        {
+            return Result.Failure<List<FormResponse>>(s.Error);
+        }
+
+        MetaPaginatedResponse<MetaForm>? response = null;
+        try
+        {
+            string url = $"{pageId}/leadgen_forms?fields=id,name,status,locale,privacy_policy,questions,follow_up_action_url,created_time&access_token={s.Value.PageAccessToken}";
+            response = await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaForm>>(url, ct);
+
+            return response?.Data.Select(f => new FormResponse
+            {
+                Id = f.Id,
+                PageId = pageId,
+                Name = f.Name,
+                Locale = f.Locale ?? "en_US",
+                Status = f.Status,
+                PrivacyPolicyUrl = f.PrivacyPolicy?.Url ?? string.Empty,
+                PrivacyPolicyLinkText = f.PrivacyPolicy?.LinkText ?? string.Empty,
+                FollowUpActionUrl = f.FollowUpActionUrl ?? string.Empty,
+                Questions = f.Questions?.Select(q => new FormQuestionResponse {
+                    Id = q.Id ?? string.Empty,
+                    Key = q.Key ?? string.Empty,
+                    Type = q.Type,
+                    Label = q.Label
+                }).ToList() ?? [],
+                CreatedAt = f.CreatedTime.UtcDateTime
+            }).ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to fetch forms from Meta for page {PageId}", pageId);
+            logger.LogWarning("Meta response: {@Response}", response);
+            return Result.Failure<List<FormResponse>>(Error.Failure("Meta.Unavailable", ex.Message));
+        }
+    }
+
+    public async Task<Result<string>> CreateFormAsync(CreateFormCommand command, CancellationToken ct = default)
+    {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+        if (s.IsFailure)
+        {
+            return Result.Failure<string>(s.Error);
+        }
+        try
+        {
+            string url = $"{command.PageId}/leadgen_forms?access_token={s.Value.PageAccessToken}";
+
+            var body = new
+            {
+                name = command.Name,
+                locale = command.Locale,
+                privacy_policy_link_text = command.PrivacyPolicyLinkText,
+                follow_up_action_url = command.FollowUpActionUrl,
+                privacy_policy = new { url = command.PrivacyPolicyUrl, link_text = command.PrivacyPolicyLinkText },
+                questions = command.Questions.Select(q => new
+                {
+                    type = q.Type,
+                    label = q.Type == "CUSTOM" ? q.Label : null
+                })
+            };
+
+            HttpResponseMessage response = await httpClient.PostAsJsonAsync(url, body, ct);
+            response.EnsureSuccessStatusCode();
+
+            MetaCreateResponse? result = await response.Content.ReadFromJsonAsync<MetaCreateResponse>(cancellationToken: ct);
+            return result?.Id ?? Result.Failure<string>(Error.Failure("Meta.Create", "No ID returned."));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to create form on Meta for page {PageId}", command.PageId);
+            return Result.Failure<string>(Error.Failure("Meta.Unavailable", ex.Message));
+        }
+    }
+
+
+    public async Task<Result<FormResponse>> GetFormByIdAsync(string formId, CancellationToken ct = default)
+    {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+        if (s.IsFailure)
+        {
+            return Result.Failure<FormResponse>(s.Error);
+        }
+
+        try
+        {
+            string url = $"{formId}?fields=id,name,status,locale,privacy_policy,questions,follow_up_action_url,created_time&access_token={s.Value.PageAccessToken}";
+            MetaForm? f = await httpClient.GetFromJsonAsync<MetaForm>(url, ct);
+            if (f is null)
+            {
+                return Result.Failure<FormResponse>(Error.Failure("Meta.NotFound", "Form not found."));
+            }
+
+            return new FormResponse
+            {
+                Id = f.Id,
+                PageId = string.Empty,   // not returned by single-form endpoint; filled from DB on upsert
+                Name = f.Name,
+                Locale = f.Locale ?? "en_US",
+                Status = f.Status,
+                PrivacyPolicyUrl = f.PrivacyPolicy?.Url ?? string.Empty,
+                PrivacyPolicyLinkText = f.PrivacyPolicy?.LinkText ?? string.Empty,
+                FollowUpActionUrl = f.FollowUpActionUrl ?? string.Empty,
+                Questions = f.Questions?.Select(q => new FormQuestionResponse
+                {
+                    Id = q.Id ?? string.Empty,
+                    Key = q.Key ?? string.Empty,
+                    Type = q.Type,
+                    Label = q.Label
+                }).ToList() ?? [],
+                CreatedAt = f.CreatedTime.UtcDateTime
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to fetch form {FormId} from Meta", formId);
+            return Result.Failure<FormResponse>(Error.Failure("Meta.Unavailable", ex.Message));
+        }
+    }
+
+    public async Task<Result> DeleteFormAsync(string formId, CancellationToken ct = default)
+    {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+
+        if (s.IsFailure)
+        {
+            return Result.Failure(s.Error);
+        }
+
+        try
+        {
+            string url = $"{formId}?access_token={s.Value.PageAccessToken}";
+
+            HttpResponseMessage response = await httpClient.DeleteAsync(url, ct);
+            response.EnsureSuccessStatusCode();
+
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to delete Meta form {FormId}", formId);
+
+            return Result.Failure(Error.Failure("Meta.Delete", ex.Message));
+        }
+    }
+
+    //public async Task<Result> UpdateFormAsync(UpdateFormCommand command, CancellationToken ct = default)
+    //{
+    //    try
+    //    {
+    //        var url = $"{command.FormId}?access_token={_options.AccessToken}";
+    //        var body = new
+    //        {
+    //            name = command.Name,
+    //            locale = command.Locale,
+    //            follow_up_action_url = command.FollowUpActionUrl
+    //        };
+    //        var response = await httpClient.PostAsJsonAsync(url, body, ct);
+    //        response.EnsureSuccessStatusCode();
+    //        return Result.Success();
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        logger.LogWarning(ex, "Failed to update form {FormId} on Meta", command.FormId);
+    //        return Result.Failure(Error.Failure("Meta.Unavailable", ex.Message));
+    //    }
+    //}
+
     // ----- Internal Meta Graph API response models -----
 
     private sealed record MetaPaginatedResponse<T>(
         [property: JsonPropertyName("data")] List<T> Data);
-
-    private sealed record MetaCampaign(
-        [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("status")] string Status,
-        [property: JsonPropertyName("objective")] string? Objective,
-        [property: JsonConverter(typeof(MetaDateTimeOffsetConverter))] DateTimeOffset CreatedTime);
-
-    private sealed record MetaAdSet(
-        [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("status")] string Status,
-        [property: JsonPropertyName("campaign_id")] string CampaignId,
-        [property: JsonConverter(typeof(MetaDateTimeOffsetConverter))] DateTimeOffset CreatedTime);
-
-    private sealed record MetaAd(
-        [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("status")] string Status,
-        [property: JsonPropertyName("adset_id")] string AdSetId,
-        [property: JsonPropertyName("campaign_id")] string CampaignId,
-        [property: JsonConverter(typeof(MetaDateTimeOffsetConverter))] DateTimeOffset CreatedTime);
-
-    private sealed record MetaLead(
-        [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("ad_id")] string? AdId,
-        [property: JsonPropertyName("campaign_id")] string? CampaignId,
-        [property: JsonPropertyName("adset_id")] string? AdSetId,
-        [property: JsonConverter(typeof(MetaDateTimeOffsetConverter))] DateTimeOffset CreatedTime,
-        [property: JsonPropertyName("field_data")] List<MetaLeadField>? FieldData);
-
-    private sealed record MetaLeadField(
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("values")] List<string> Values);
 }

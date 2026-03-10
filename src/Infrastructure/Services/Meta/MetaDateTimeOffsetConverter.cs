@@ -9,20 +9,26 @@ public class MetaDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
     public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         string? value = reader.GetString();
-        if (value == null)
+        if (string.IsNullOrWhiteSpace(value))
         {
             return default;
         }
 
-        // Insert colon before last 2 digits of timezone if missing
-        if (value.Length > 5 && value[^5] != ':' && (value[^5] == '+' || value[^5] == '-'))
+        // Convert timezone from +0600 -> +06:00
+        if (value.Length >= 5 &&
+            (value[^5] == '+' || value[^5] == '-') &&
+            value[^3] != ':')
         {
-            value = value[..^2] + ":" + value[^2..];
+            value = value.Insert(value.Length - 2, ":");
         }
 
         return DateTimeOffset.Parse(value, CultureInfo.InvariantCulture);
     }
 
     public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
-        => writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture));
+    {
+        writer.WriteStringValue(
+            value.ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture)
+        );
+    }
 }
