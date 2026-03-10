@@ -1,5 +1,11 @@
 ﻿using Application.Abstractions.Data;
-using Domain.Meta;
+using Domain.Ads;
+using Domain.AdSets;
+using Domain.Campaigns;
+using Domain.FormQuestions;
+using Domain.Forms;
+using Domain.Leads;
+using Domain.MetaSettings;
 using Domain.Users;
 using Infrastructure.Persistence.DomainEvents;
 using Microsoft.EntityFrameworkCore;
@@ -16,8 +22,10 @@ public sealed class ApplicationDbContext(
     public DbSet<Campaign> Campaigns { get; set; }
     public DbSet<Ad> Ads { get; set; }
     public DbSet<AdSet> AdSets { get; set; }
-
     public DbSet<Lead> Leads { get; set; }
+    public DbSet<Form> Forms { get; set; }
+    public DbSet<MetaSetting> MetaSettings { get; set; }
+    public DbSet<FormQuestion> FormQuestions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
