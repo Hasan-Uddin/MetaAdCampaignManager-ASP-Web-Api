@@ -3,12 +3,13 @@ using Application.Abstractions.Messaging;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using Application.Abstractions.Services.Meta;
-using Domain.Meta;
+using Domain.Campaigns;
 
 namespace Application.Features.Meta.Campaigns.Get;
 
 internal sealed class GetCampaignsQueryHandler(
     IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider,
     IMetaApiService metaApi) : IQueryHandler<GetCampaignsQuery, List<CampaignResponse>>
 {
     public async Task<Result<List<CampaignResponse>>> Handle(GetCampaignsQuery query, CancellationToken cancellationToken)
@@ -23,15 +24,22 @@ internal sealed class GetCampaignsQueryHandler(
 
         // Fallback to DB
         List<CampaignResponse> campaigns = await context.Campaigns
+            .AsNoTracking()
             .Where(c => c.AdAccountId == query.AdAccountId)
             .Select(c => new CampaignResponse
             {
                 Id = c.Id,
                 AdAccountId = c.AdAccountId,
                 Name = c.Name,
-                Status = c.Status,
                 Objective = c.Objective,
-                CreatedAt = c.CreatedAt
+                BuyingType = c.BuyingType,
+                ConfiguredStatus = c.ConfiguredStatus,
+                Status = c.Status,
+                BudgetRemaining = c.BudgetRemaining,
+                CanUseSpendCap = c.CanUseSpendCap,
+                IsSkadnetworkAttribution = c.IsSkadnetworkAttribution,
+                CreatedAt = c.CreatedAt,
+                SyncedAt = c.SyncedAt,
             })
             .ToListAsync(cancellationToken);
 
@@ -56,8 +64,13 @@ internal sealed class GetCampaignsQueryHandler(
             entity.Name = item.Name;
             entity.Status = item.Status;
             entity.Objective = item.Objective;
+            entity.BuyingType = item.BuyingType;
+            entity.ConfiguredStatus = item.ConfiguredStatus;
+            entity.BudgetRemaining = item.BudgetRemaining;
+            entity.CanUseSpendCap = item.CanUseSpendCap;
+            entity.IsSkadnetworkAttribution = item.IsSkadnetworkAttribution;
             entity.CreatedAt = item.CreatedAt;
-            entity.SyncedAt = DateTime.UtcNow;
+            entity.SyncedAt = dateTimeProvider.UtcNow;
         }
 
         await context.SaveChangesAsync(ct);

@@ -1,6 +1,6 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
-using Domain.Meta;
+using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using System.Text.Json;
@@ -39,7 +39,7 @@ internal sealed class HandleWebhookCommandHandler(IApplicationDbContext context)
 
         if (existing is null)
         {
-            var lead = new Domain.Meta.Lead
+            var lead = new Lead
             {
                 Id = value.LeadgenId,
                 FormId = value.FormId,

@@ -3,7 +3,7 @@ using Application.Abstractions.Messaging;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using Application.Abstractions.Services.Meta;
-using Domain.Meta;
+using Domain.Leads;
 
 namespace Application.Features.Meta.Leads.Get;
 
@@ -48,7 +48,7 @@ internal sealed class GetLeadsQueryHandler(
             Lead? entity = existing.FirstOrDefault(l => l.Id == item.Id);
             if (entity is null)
             {
-                entity = new Domain.Meta.Lead { Id = item.Id, FormId = formId };
+                entity = new Lead { Id = item.Id, FormId = formId };
                 context.Leads.Add(entity);
             }
             entity.AdId = item.AdId;

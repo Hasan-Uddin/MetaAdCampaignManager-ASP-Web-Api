@@ -3,7 +3,7 @@ using Application.Abstractions.Messaging;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using Application.Abstractions.Services.Meta;
-using Domain.Meta;
+using Domain.AdSets;
 
 namespace Application.Features.Meta.AdSets.Get;
 

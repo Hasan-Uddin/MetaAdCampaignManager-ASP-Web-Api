@@ -1,4 +1,4 @@
-using Domain.Meta.Events;
+using Domain.Leads;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
 

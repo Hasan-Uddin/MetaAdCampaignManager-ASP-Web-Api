@@ -3,7 +3,7 @@ using Application.Abstractions.Messaging;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using Application.Abstractions.Services.Meta;
-using Domain.Meta;
+using Domain.Ads;
 
 namespace Application.Features.Meta.Ads.Get;
 
@@ -47,7 +47,7 @@ internal sealed class GetAdsQueryHandler(
             Ad? entity = existing.FirstOrDefault(a => a.Id == item.Id);
             if (entity is null)
             {
-                entity = new Domain.Meta.Ad { Id = item.Id };
+                entity = new Ad { Id = item.Id };
                 context.Ads.Add(entity);
             }
             entity.AdSetId = item.AdSetId;
