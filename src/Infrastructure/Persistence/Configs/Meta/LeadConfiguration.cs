@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Domain.Meta;
+using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
