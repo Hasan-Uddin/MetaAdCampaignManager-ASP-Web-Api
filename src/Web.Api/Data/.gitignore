@@ -1,0 +1,3 @@
+# .gitignore file inside the empty folder
+*
+!.gitignore
