@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Authentication.MetaAuth;
 using Application.Abstractions.Data;
 using Application.Abstractions.Email;
 using Application.Abstractions.Interfaces;
@@ -8,9 +9,11 @@ using Infrastructure.Persistence;
 using Infrastructure.Persistence.Database;
 using Infrastructure.Persistence.DomainEvents;
 using Infrastructure.Services.Authentication;
+using Infrastructure.Services.Authentication.MetaAuth;
 using Infrastructure.Services.Authorization;
 using Infrastructure.Services.Email;
 using Infrastructure.Services.Meta;
+using Infrastructure.Services.Meta.Settings;
 using Infrastructure.Services.Time;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -75,6 +78,7 @@ public static class DependencyInjection
         services.Configure<MetaApiOptions>(
             configuration.GetSection(MetaApiOptions.SectionName));
 
+        services.AddHttpClient<IMetaAuthService, MetaAuthService>();
         services.AddHttpClient<IMetaApiService, MetaApiService>((sp, client) =>
         {
             MetaApiOptions options = sp
@@ -85,6 +89,7 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Add("Accept", "application/json");
             client.Timeout = TimeSpan.FromSeconds(30);
         });
+        services.AddScoped<IMetaSettingsProvider, MetaSettingsProvider>();
 
         return services;
     }
