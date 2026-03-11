@@ -10,6 +10,6 @@ internal static class ClaimsPrincipalExtensions
 
         return Guid.TryParse(userId, out Guid parsedUserId) ?
             parsedUserId : null;
-            //throw new ApplicationException("User id is unavailable");
+        //throw new ApplicationException("User id is unavailable");
     }
 }

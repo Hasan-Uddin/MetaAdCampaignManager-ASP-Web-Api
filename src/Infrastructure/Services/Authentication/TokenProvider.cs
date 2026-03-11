@@ -10,7 +10,7 @@ namespace Infrastructure.Services.Authentication;
 
 internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvider
 {
-    public TokenResult Create(User user)
+    public TokenResponse Create(User user)
     {
         string secretKey = configuration["Jwt:Secret"]!;
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
@@ -18,13 +18,17 @@ internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvid
 
         int expirationMinutes = configuration.GetValue<int>("Jwt:ExpirationInMinutes");
         DateTime expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
+        long expiresInSec = (long)(expiresAt - DateTime.UtcNow).TotalSeconds;
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(
             [
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email)
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+                new Claim("name", user.Name),
+                new Claim("picture", user.PictureUrl ?? string.Empty),
+                new Claim("facebook_id", user.FacebookId ?? string.Empty)
             ]),
             Expires = expiresAt,
             SigningCredentials = credentials,
@@ -35,10 +39,10 @@ internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvid
         var handler = new JsonWebTokenHandler();
         string token = handler.CreateToken(tokenDescriptor);
 
-        return new TokenResult(token, expiresAt);
+        return new TokenResponse(token, expiresInSec, expiresAt);
     }
 
-    public bool ShouldSlide(TokenResult tokenResult)
+    public bool ShouldSlide(TokenResponse tokenResult)
     {
         int threshold = configuration.GetValue<int>("Jwt:SlidingThresholdInMinutes");
         return tokenResult.ExpiresAtUtc - DateTime.UtcNow <= TimeSpan.FromMinutes(threshold);
