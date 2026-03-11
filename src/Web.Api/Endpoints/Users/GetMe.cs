@@ -1,5 +1,6 @@
 ﻿using Application.Abstractions.Authentication;
 using Application.Abstractions.Messaging;
+using Application.Features.Users;
 using Application.Features.Users.GetMe;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -16,7 +17,7 @@ internal sealed class GetMe : IEndpoint
             IQueryHandler<GetMeQuery, UserResponse> handler,
             CancellationToken cancellationToken) =>
         {
-            if(!userContext.IsAuthenticated)
+            if (!userContext.IsAuthenticated)
             {
                 return Results.Unauthorized();
             }

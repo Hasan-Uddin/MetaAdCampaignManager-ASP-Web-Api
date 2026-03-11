@@ -1,4 +1,5 @@
 ﻿using Application.Abstractions.Messaging;
+using Application.Features.Users;
 using Application.Features.Users.GetByEmail;
 using SharedKernel;
 using Web.Api.Extensions;
