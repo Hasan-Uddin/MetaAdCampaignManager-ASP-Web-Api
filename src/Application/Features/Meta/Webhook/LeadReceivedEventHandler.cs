@@ -9,7 +9,7 @@ internal sealed class LeadReceivedEventHandler(ILogger<LeadReceivedEventHandler>
 {
     public Task Handle(LeadReceivedEvent domainEvent, CancellationToken cancellationToken)
     {
-        if(logger.IsEnabled(LogLevel.Information))
+        if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation(
                 "Meta webhook: new lead received. LeadId={LeadId}, FormId={FormId}, CampaignId={CampaignId}",

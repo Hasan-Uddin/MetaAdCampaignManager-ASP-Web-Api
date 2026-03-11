@@ -2,7 +2,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Services.Meta;
 using Domain.Forms;
-using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Features.Meta.Forms.Delete;

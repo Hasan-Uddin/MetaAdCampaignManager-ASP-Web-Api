@@ -31,9 +31,11 @@ internal sealed class CreateFormCommandHandler(
             PrivacyPolicyLinkText = command.PrivacyPolicyLinkText,
             FollowUpActionUrl = command.FollowUpActionUrl,
             Questions = command.Questions
-                .Select(q => new FormQuestion { 
+                .Select(q => new FormQuestion
+                {
                     Type = q.Type,
-                    Label = q.Type != "CUSTOM" ? q.Label : null})
+                    Label = q.Type != "CUSTOM" ? q.Label : null
+                })
                 .ToList(),
             CreatedAt = DateTime.UtcNow,
             SyncedAt = DateTime.UtcNow

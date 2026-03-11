@@ -1,9 +1,9 @@
+using System.Text.Json;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
-using System.Text.Json;
 
 namespace Application.Features.Meta.Webhook;
 

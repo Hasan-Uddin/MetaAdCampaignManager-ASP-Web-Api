@@ -1,9 +1,9 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
-using Microsoft.EntityFrameworkCore;
-using SharedKernel;
 using Application.Abstractions.Services.Meta;
 using Domain.Campaigns;
+using Microsoft.EntityFrameworkCore;
+using SharedKernel;
 
 namespace Application.Features.Meta.Campaigns.Get;
 
