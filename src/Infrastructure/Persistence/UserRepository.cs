@@ -13,6 +13,9 @@ public class UserRepository(IApplicationDbContext context) : IUserRepository
     public async Task<User?> GetByIdAsync(Guid id)
         => await context.Users.FirstOrDefaultAsync(x => x.Id == id);
 
+    public async Task<User?> GetByFacebookIdAsync(string id)
+        => await context.Users.FirstOrDefaultAsync(x => x.FacebookId == id);
+
     public async Task AddAsync(User user)
         => await context.Users.AddAsync(user);
 

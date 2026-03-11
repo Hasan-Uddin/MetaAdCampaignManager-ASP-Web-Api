@@ -12,7 +12,7 @@ internal sealed class FormQuestionConfiguration : IEntityTypeConfiguration<FormQ
 
         builder.Property(f => f.Id)
             .HasMaxLength(70);
-        
+
         builder.Property(f => f.Type)
             .HasMaxLength(50);
 
