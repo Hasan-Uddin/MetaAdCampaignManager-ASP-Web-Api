@@ -1,26 +1,26 @@
-﻿using Application.Abstractions.Messaging;
-using Application.Features.Meta.MetaSettings.Create;
-using SharedKernel;
-using Web.Api.Extensions;
-using Web.Api.Infrastructure;
+﻿//using Application.Abstractions.Messaging;
+//using Application.Features.Meta.MetaSettings.Create;
+//using SharedKernel;
+//using Web.Api.Extensions;
+//using Web.Api.Infrastructure;
 
-namespace Web.Api.Endpoints.MetaSettings;
+//namespace Web.Api.Endpoints.MetaSettings;
 
-internal sealed class Create : IEndpoint
-{
-    public void MapEndpoint(IEndpointRouteBuilder app)
-    {
-        app.MapPost("meta/settings/set", async (
-            CreateeMetaSettingsCommand command,
-            ICommandHandler<CreateeMetaSettingsCommand> handler,
-            CancellationToken cancellationToken) =>
-        {
-            Result result = await handler.Handle(command, cancellationToken);
-            return result.Match(Results.NoContent, CustomResults.Problem);
-        }).WithTags(Tags.MetaSettings)
-        .Produces<List<CreateeMetaSettingsCommand>>();
-    }
-}
+//internal sealed class Create : IEndpoint
+//{
+//    public void MapEndpoint(IEndpointRouteBuilder app)
+//    {
+//        app.MapPost("meta/settings/set", async (
+//            CreateeMetaSettingsCommand command,
+//            ICommandHandler<CreateeMetaSettingsCommand> handler,
+//            CancellationToken cancellationToken) =>
+//        {
+//            Result result = await handler.Handle(command, cancellationToken);
+//            return result.Match(Results.NoContent, CustomResults.Problem);
+//        }).WithTags(Tags.MetaSettings)
+//        .Produces<List<CreateeMetaSettingsCommand>>();
+//    }
+//}
 
 
 // eg
