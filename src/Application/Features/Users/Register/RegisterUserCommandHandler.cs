@@ -1,5 +1,4 @@
-﻿using Application.Abstractions.Authentication;
-using Application.Abstractions.Data;
+﻿using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +6,7 @@ using SharedKernel;
 
 namespace Application.Features.Users.Register;
 
-internal sealed class RegisterUserCommandHandler(IApplicationDbContext context, IPasswordHasher passwordHasher)
+internal sealed class RegisterUserCommandHandler(IApplicationDbContext context)
     : ICommandHandler<RegisterUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
@@ -22,7 +21,7 @@ internal sealed class RegisterUserCommandHandler(IApplicationDbContext context, 
             Id = Guid.NewGuid(),
             Email = command.Email,
             Name = command.FirstName,
-            PasswordHash = passwordHasher.Hash(command.Password)
+            //PasswordHash = passwordHasher.Hash(command.Password)
         };
 
         user.Raise(new UserRegisteredDomainEvent(user.Id));

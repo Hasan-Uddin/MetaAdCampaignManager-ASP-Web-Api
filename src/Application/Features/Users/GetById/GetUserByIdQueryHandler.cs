@@ -24,7 +24,9 @@ internal sealed class GetUserByIdQueryHandler(IApplicationDbContext context, IUs
                 Id = u.Id,
                 Name = u.Name,
                 Email = u.Email,
-                PictureUrl = u.PictureUrl
+                FacebookId = u.FacebookId,
+                PictureUrl = u.PictureUrl,
+                CreatedAt = u.CreatedAt
             })
             .SingleOrDefaultAsync(cancellationToken);
 

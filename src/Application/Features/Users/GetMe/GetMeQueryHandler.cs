@@ -26,7 +26,9 @@ internal sealed class GetMeQueryHandler(IApplicationDbContext context, IUserCont
                 Id = u.Id,
                 Name = u.Name,
                 Email = u.Email,
-                PictureUrl = u.PictureUrl
+                FacebookId = u.FacebookId,
+                PictureUrl = u.PictureUrl,
+                CreatedAt = u.CreatedAt
             })
             .SingleOrDefaultAsync(cancellationToken);
 
