@@ -1,5 +1,4 @@
-﻿using Domain.MetaSettings;
-using SharedKernel;
+﻿using SharedKernel;
 
 namespace Infrastructure.Services.Meta.Settings;
 
@@ -9,10 +8,7 @@ public interface IMetaSettingsProvider
 }
 
 public sealed record MetaSettingsSnapshot(
-    string AppId,
-    string AppSecret,
     string AccessToken,
     string PageId,
     string AdAccountId,
-    string WebhookVerifyToken,
     string PageAccessToken);
