@@ -4,10 +4,11 @@ namespace Application.Abstractions.Authentication;
 
 public interface ITokenProvider
 {
-    TokenResult Create(User user);
-    bool ShouldSlide(TokenResult tokenResult);
+    TokenResponse Create(User user);
+    bool ShouldSlide(TokenResponse tokenResult);
 }
 
-public sealed record TokenResult(
+public sealed record TokenResponse(
     string AccessToken,
+    long ExpiresInSec,
     DateTime ExpiresAtUtc);
