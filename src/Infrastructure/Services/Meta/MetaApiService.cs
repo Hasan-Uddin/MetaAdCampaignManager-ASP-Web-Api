@@ -60,7 +60,7 @@ public sealed class MetaApiService(
                 Objective = c.Objective ?? string.Empty,
                 ConfiguredStatus = c.ConfiguredStatus ?? string.Empty,
                 BuyingType = c.BuyingType ?? string.Empty,
-                BudgetRemaining = Convert.ToInt32(c.BudgetRemaining?? "0", CultureInfo.CurrentCulture),
+                BudgetRemaining = Convert.ToInt32(c.BudgetRemaining ?? "0", CultureInfo.CurrentCulture),
                 CanUseSpendCap = c.CanUseSpendCap ?? false,
                 IsSkadnetworkAttribution = c.IsSkadnetworkAttribution ?? false,
                 CreatedAt = c.CreatedTime.UtcDateTime,
@@ -190,7 +190,8 @@ public sealed class MetaApiService(
                 PrivacyPolicyUrl = f.PrivacyPolicy?.Url ?? string.Empty,
                 PrivacyPolicyLinkText = f.PrivacyPolicy?.LinkText ?? string.Empty,
                 FollowUpActionUrl = f.FollowUpActionUrl ?? string.Empty,
-                Questions = f.Questions?.Select(q => new FormQuestionResponse {
+                Questions = f.Questions?.Select(q => new FormQuestionResponse
+                {
                     Id = q.Id ?? string.Empty,
                     Key = q.Key ?? string.Empty,
                     Type = q.Type,
