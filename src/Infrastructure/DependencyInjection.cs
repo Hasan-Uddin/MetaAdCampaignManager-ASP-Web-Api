@@ -47,7 +47,6 @@ public static class DependencyInjection
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddTransient<IDomainEventsDispatcher, DomainEventsDispatcher>();
-        services.AddSingleton<IGoogleAuthSettings, GoogleAuthSettings>();
         return services;
     }
     private static IServiceCollection Repos(this IServiceCollection services)
@@ -179,8 +178,6 @@ public static class DependencyInjection
         services.AddScoped<PermissionProvider>();
 
         services.AddTransient<IAuthorizationHandler, PermissionAuthorizationHandler>();
-
-        services.AddHttpClient<IGoogleAuthService, GoogleAuthService>();
 
         services.AddTransient<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
 
