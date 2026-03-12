@@ -8,6 +8,8 @@ public interface IMetaSettingsProvider
 }
 
 public sealed record MetaSettingsSnapshot(
+    string AppId,
+    string AppSecret,
     string AccessToken,
     string PageId,
     string AdAccountId,

@@ -12,7 +12,7 @@ internal sealed class MetaSettingsProvider(
     IMetaAuthService metaAuth,
     ILogger<MetaSettingsProvider> logger) : IMetaSettingsProvider
 {
-    // Refresh if token expires within 7 days
+    private static readonly SemaphoreSlim RefreshLock = new(1, 1);
     private static readonly TimeSpan RefreshThreshold = TimeSpan.FromDays(7);
 
     public async Task<Result<MetaSettingsSnapshot>> GetAsync(CancellationToken ct = default)
@@ -25,28 +25,41 @@ internal sealed class MetaSettingsProvider(
                 Error.Failure("Meta.NotConfigured", "Meta settings not configured. Call POST /meta/auth/login first."));
         }
 
-        // Auto-refresh if close to expiry
         if (DateTime.UtcNow >= s.AccessTokenExpiresAt - RefreshThreshold)
         {
-            logger.LogInformation("Meta access token nearing expiry, refreshing automatically...");
-
-            Result<TokenResult> refreshed = await metaAuth.RefreshLongLivedTokenAsync(s.AccessToken, ct);
-            if (refreshed.IsSuccess)
+            await RefreshLock.WaitAsync(ct);
+            try
             {
-                s.AccessToken = refreshed.Value.AccessToken;
-                s.AccessTokenExpiresAt = DateTime.UtcNow.AddSeconds(refreshed.Value.ExpiresInSeconds);
-                s.UpdatedAt = DateTime.UtcNow;
-                await context.SaveChangesAsync(ct);
+                await ((DbContext)context).Entry(s).ReloadAsync(ct);
 
-                //logger.LogInformation("Meta access token refreshed successfully. New expiry: {ExpiresAt}", s.AccessTokenExpiresAt);
+                if (DateTime.UtcNow >= s.AccessTokenExpiresAt - RefreshThreshold)
+                {
+                    logger.LogInformation("Meta access token nearing expiry, refreshing automatically...");
+                    Result<TokenResult> refreshed = await metaAuth.RefreshLongLivedTokenAsync(s.AccessToken, ct);
+
+                    if (refreshed.IsSuccess)
+                    {
+                        s.AccessToken = refreshed.Value.AccessToken;
+                        s.AccessTokenExpiresAt = DateTime.UtcNow.AddSeconds(refreshed.Value.ExpiresInSeconds);
+                        s.UpdatedAt = DateTime.UtcNow;
+                        await context.SaveChangesAsync(ct);
+                        //logger.LogInformation("Meta token refreshed. New expiry: {ExpiresAt}", s.AccessTokenExpiresAt);
+                    }
+                    else
+                    {
+                        logger.LogWarning("Failed to auto-refresh Meta token: {Error}", refreshed.Error.Description);
+                    }
+                }
             }
-            else
+            finally
             {
-                logger.LogWarning("Failed to auto-refresh Meta token: {Error}", refreshed.Error.Description);
+                RefreshLock.Release();
             }
         }
 
         return new MetaSettingsSnapshot(
+            s.AppId,
+            s.AppSecret,
             s.AccessToken,
             s.PageId,
             s.AdAccountId,
