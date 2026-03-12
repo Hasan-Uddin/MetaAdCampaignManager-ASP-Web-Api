@@ -11,4 +11,5 @@ public static class Tags
     public const string Ads = "Ads";
     public const string Leads = "Leads";
     public const string MetaSettings = "MetaSettings";
+    public const string Apps = "App";
 }
