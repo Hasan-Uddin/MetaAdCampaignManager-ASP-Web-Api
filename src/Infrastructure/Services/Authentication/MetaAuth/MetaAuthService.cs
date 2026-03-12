@@ -13,15 +13,15 @@ internal sealed class MetaAuthService(
     IOptions<MetaApiOptions> options,
     ILogger<MetaAuthService> logger) : IMetaAuthService
 {
-    private readonly MetaApiOptions _option = options.Value;
-    private readonly string BaseUrl = options.Value.BaseUrl;
-    private const string Scopes = "pages_manage_ads,pages_read_engagement,leads_retrieval,ads_management";
+    private readonly MetaApiOptions _options = options.Value;
+    private const string BaseUrl = $"https://graph.facebook.com/v25.0/";
+    private const string Scopes = "pages_manage_ads,pages_read_engagement,leads_retrieval,ads_management,business_management";
 
-    public Uri GetLoginUrl(string redirectUri, string state)
+    public Uri GetLoginUrl(string appId, string redirectUri, string state)
     {
         string url =
             $"https://www.facebook.com/v25.0/dialog/oauth" +
-            $"?client_id={_option.AppID}" +
+            $"?client_id={appId}" +
             $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
             $"&scope={Uri.EscapeDataString(Scopes)}" +
             $"&state={Uri.EscapeDataString(state)}" +
@@ -36,8 +36,8 @@ internal sealed class MetaAuthService(
         {
             string url =
                 $"{BaseUrl}oauth/access_token" +
-                $"?client_id={_option.AppID}" +
-                $"&client_secret={_option.AppSecret}" +
+                $"?client_id={_options.AppID}" +
+                $"&client_secret={_options.AppSecret}" +
                 $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
                 $"&code={code}";
 
@@ -57,20 +57,19 @@ internal sealed class MetaAuthService(
         }
     }
 
-    public async Task<Result<TokenResult>> ExchangeLongLivedTokenAsync(
-        string shortLivedToken,
-        CancellationToken ct = default)
+    public async Task<Result<TokenResult>> ExchangeLongLivedTokenAsync(string shortLivedToken, CancellationToken ct = default)
     {
         try
         {
-            string url = $"{BaseUrl}oauth/access_token?grant_type=fb_exchange_token&client_id={_option.AppID}&client_secret={_option.AppSecret}&fb_exchange_token={shortLivedToken}";
+            string url = $"{BaseUrl}oauth/access_token?grant_type=fb_exchange_token&client_id={_options.AppID}&client_secret={_options.AppSecret}&fb_exchange_token={shortLivedToken}";
             TokenResponse? response = await httpClient.GetFromJsonAsync<TokenResponse>(url, ct);
+
             if (response?.AccessToken is null)
             {
                 return Result.Failure<TokenResult>(Error.Failure("Meta.TokenExchange", "Failed to exchange long-lived token."));
             }
 
-            return new TokenResult(response.AccessToken, response.ExpiresIn ?? 5183991); // 60 days default
+            return new TokenResult(response.AccessToken, response.ExpiresIn ?? 5183991);
         }
         catch (Exception ex)
         {
@@ -80,10 +79,7 @@ internal sealed class MetaAuthService(
     }
 
     public async Task<Result<TokenResult>> RefreshLongLivedTokenAsync(string longLivedToken, CancellationToken ct = default)
-    {
-        // Meta refreshes by simply exchanging the long-lived token with itself
-        return await ExchangeLongLivedTokenAsync(longLivedToken, ct);
-    }
+        => await ExchangeLongLivedTokenAsync(longLivedToken, ct);
 
     public async Task<Result<MetaPageInfo>> GetFirstPageAsync(string longLivedToken, CancellationToken ct = default)
     {
@@ -92,6 +88,7 @@ internal sealed class MetaAuthService(
             string url = $"{BaseUrl}me/accounts?fields=id,access_token&access_token={longLivedToken}";
             MetaPaginatedResponse<MetaAccount>? response = await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaAccount>>(url, ct);
             MetaAccount? page = response?.Data.FirstOrDefault();
+
             if (page is null)
             {
                 return Result.Failure<MetaPageInfo>(Error.Failure("Meta.NoPages", "No pages found."));
@@ -113,6 +110,7 @@ internal sealed class MetaAuthService(
             string url = $"{BaseUrl}me/adaccounts?fields=id&access_token={longLivedToken}";
             MetaPaginatedResponse<MetaAdAccount>? response = await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaAdAccount>>(url, ct);
             MetaAdAccount? account = response?.Data.FirstOrDefault();
+
             if (account is null)
             {
                 return Result.Failure<string>(Error.Failure("Meta.NoAdAccounts", "No ad accounts found."));
@@ -139,11 +137,7 @@ internal sealed class MetaAuthService(
                 return Result.Failure<MetaUserInfo>(Error.Failure("Meta.UserInfo", "Failed to fetch user info."));
             }
 
-            return new MetaUserInfo(
-                response.Id,
-                response.Name,
-                response.Email,
-                response.Picture?.Data?.Url);
+            return new MetaUserInfo(response.Id, response.Name, response.Email, response.Picture?.Data?.Url);
         }
         catch (Exception ex)
         {
@@ -151,6 +145,47 @@ internal sealed class MetaAuthService(
             return Result.Failure<MetaUserInfo>(Error.Failure("Meta.Unavailable", ex.Message));
         }
     }
+
+    public async Task<Result<List<MetaAppInfo>>> GetUserAppsAsync(string accessToken, CancellationToken ct = default)
+    {
+        try
+        {
+            // get user's businesses
+            string businessUrl = $"{BaseUrl}me/businesses?fields=id,name&access_token={accessToken}";
+            MetaPaginatedResponse<MetaBusinessResponse>? businesses =
+                await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaBusinessResponse>>(businessUrl, ct);
+
+            if (businesses is null || businesses.Data.Count == 0)
+            {
+                return Result.Failure<List<MetaAppInfo>>(
+                    Error.Failure("Meta.NoBusinesses", "No Business Manager accounts found."));
+            }
+
+            var apps = new List<MetaAppInfo>();
+
+            // get owned apps for each business
+            foreach (MetaBusinessResponse business in businesses.Data)
+            {
+                string appsUrl = $"{BaseUrl}{business.Id}/owned_apps?fields=id,name,category&access_token={accessToken}";
+                MetaPaginatedResponse<MetaAppResponse>? response =
+                    await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaAppResponse>>(appsUrl, ct);
+
+                if (response?.Data is not null)
+                {
+                    apps.AddRange(response.Data.Select(a => new MetaAppInfo(a.Id, a.Name, a.Category ?? string.Empty)));
+                }
+            }
+
+            return apps;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to fetch user apps");
+            return Result.Failure<List<MetaAppInfo>>(Error.Failure("Meta.Unavailable", ex.Message));
+        }
+    }
+
+    // ====================== Private response models ========================
 
     private sealed record TokenResponse(
         [property: JsonPropertyName("access_token")] string? AccessToken,
@@ -166,16 +201,24 @@ internal sealed class MetaAuthService(
     private sealed record MetaAdAccount(
         [property: JsonPropertyName("id")] string Id);
 
-
     private sealed record MetaUserResponse(
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("email")] string? Email,
-    [property: JsonPropertyName("picture")] MetaPictureWrapper? Picture);
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("email")] string? Email,
+        [property: JsonPropertyName("picture")] MetaPictureWrapper? Picture);
 
     private sealed record MetaPictureWrapper(
         [property: JsonPropertyName("data")] MetaPictureData? Data);
 
     private sealed record MetaPictureData(
         [property: JsonPropertyName("url")] string? Url);
+
+    private sealed record MetaAppResponse(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("category")] string? Category);
+
+    private sealed record MetaBusinessResponse(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name);
 }
