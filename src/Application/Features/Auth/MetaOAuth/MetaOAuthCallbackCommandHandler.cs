@@ -20,7 +20,7 @@ internal sealed class MetaOAuthCallbackCommandHandler(
 {
     public async Task<Result<MetaOAuthCallbackCommandResponse>> Handle(MetaOAuthCallbackCommand command, CancellationToken cancellationToken)
     {
-        // Exchange code → long-lived access token
+        // Exchange code
         Result<TokenResult> tokenResult = await metaAuth.ExchangeCodeAsync(
             command.Code, command.RedirectUri, cancellationToken);
         if (tokenResult.IsFailure)
@@ -28,27 +28,31 @@ internal sealed class MetaOAuthCallbackCommandHandler(
             return Result.Failure<MetaOAuthCallbackCommandResponse>(tokenResult.Error);
         }
 
-        Result<TokenResult> longLivedResult = await metaAuth.ExchangeLongLivedTokenAsync(tokenResult.Value.AccessToken, cancellationToken);
+        // Convert to long-lived token
+        Result<TokenResult> longLivedResult = await metaAuth.ExchangeLongLivedTokenAsync(
+            tokenResult.Value.AccessToken, cancellationToken);
         if (longLivedResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(longLivedResult.Error);
         }
 
-        // Fetch page info + ad account
-        Result<MetaPageInfo> pageInfoResult = await metaAuth.GetFirstPageAsync(longLivedResult.Value.AccessToken, cancellationToken);
+        // get page info, ad account id, and user info
+        Result<MetaPageInfo> pageInfoResult = await metaAuth.GetFirstPageAsync(
+            longLivedResult.Value.AccessToken, cancellationToken);
         if (pageInfoResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(pageInfoResult.Error);
         }
 
-        Result<string> adAccountResult = await metaAuth.GetFirstAdAccountIdAsync(longLivedResult.Value.AccessToken, cancellationToken);
+        Result<string> adAccountResult = await metaAuth.GetFirstAdAccountIdAsync(
+            longLivedResult.Value.AccessToken, cancellationToken);
         if (adAccountResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(adAccountResult.Error);
         }
 
-        // Fetch Meta user info
-        Result<MetaUserInfo> metaUserResult = await metaAuth.GetUserInfoAsync(longLivedResult.Value.AccessToken, cancellationToken);
+        Result<MetaUserInfo> metaUserResult = await metaAuth.GetUserInfoAsync(
+            longLivedResult.Value.AccessToken, cancellationToken);
         if (metaUserResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(metaUserResult.Error);
@@ -56,7 +60,6 @@ internal sealed class MetaOAuthCallbackCommandHandler(
 
         MetaUserInfo metaUser = metaUserResult.Value;
 
-        // Create/update User
         User? user = metaUser.Email is not null
             ? await userRepository.GetByEmailAsync(metaUser.Email)
             : await userRepository.GetByFacebookIdAsync(metaUser.Id);
@@ -73,7 +76,6 @@ internal sealed class MetaOAuthCallbackCommandHandler(
 
         await userRepository.SaveChangesAsync();
 
-        // Create/update singleton MetaSettings row
         MetaSetting? settings = await context.MetaSettings
             .FirstOrDefaultAsync(x => x.UserId == user.Id, cancellationToken);
 
@@ -81,12 +83,13 @@ internal sealed class MetaOAuthCallbackCommandHandler(
         {
             settings = MetaSetting.Create(
                 user.Id,
+                command.AppId,
+                command.AppSecret,
                 longLivedResult.Value.AccessToken,
                 pageInfoResult.Value.PageId,
                 adAccountResult.Value,
                 pageInfoResult.Value.PageAccessToken,
-                dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds)
-            );
+                dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds));
 
             context.MetaSettings.Add(settings);
         }

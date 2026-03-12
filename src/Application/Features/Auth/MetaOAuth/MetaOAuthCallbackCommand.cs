@@ -4,4 +4,6 @@ namespace Application.Features.Auth.MetaOAuth;
 
 public sealed record MetaOAuthCallbackCommand(
     string Code,
-    string RedirectUri) : ICommand<MetaOAuthCallbackCommandResponse>;
+    string RedirectUri,
+    string AppId,
+    string AppSecret) : ICommand<MetaOAuthCallbackCommandResponse>;
