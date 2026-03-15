@@ -89,6 +89,7 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(30);
         });
         services.AddScoped<IMetaSettingsProvider, MetaSettingsProvider>();
+        services.AddHostedService<LeadSyncBackgroundService>();
 
         return services;
     }
