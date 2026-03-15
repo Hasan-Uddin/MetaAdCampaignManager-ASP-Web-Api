@@ -11,6 +11,6 @@ public sealed record UserResponse
     public string Name { get; init; }
 
     public string? PictureUrl { get; init; }
-    
+
     public DateTime CreatedAt { get; set; }
 }
