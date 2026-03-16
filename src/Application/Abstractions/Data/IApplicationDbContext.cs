@@ -3,6 +3,7 @@ using Domain.AdSets;
 using Domain.Campaigns;
 using Domain.FormQuestions;
 using Domain.Forms;
+using Domain.FormTemplates;
 using Domain.Leads;
 using Domain.MetaSettings;
 using Domain.Users;
@@ -20,5 +21,6 @@ public interface IApplicationDbContext
     DbSet<Form> Forms { get; }
     DbSet<MetaSetting> MetaSettings { get; }
     DbSet<FormQuestion> FormQuestions { get; }
+    DbSet<FormTemplate> FormTemplates { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
