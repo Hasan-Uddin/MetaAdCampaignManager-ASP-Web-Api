@@ -4,6 +4,7 @@ using Domain.AdSets;
 using Domain.Campaigns;
 using Domain.FormQuestions;
 using Domain.Forms;
+using Domain.FormTemplates;
 using Domain.Leads;
 using Domain.MetaSettings;
 using Domain.Users;
@@ -26,6 +27,7 @@ public sealed class ApplicationDbContext(
     public DbSet<Form> Forms { get; set; }
     public DbSet<MetaSetting> MetaSettings { get; set; }
     public DbSet<FormQuestion> FormQuestions { get; set; }
+    public DbSet<FormTemplate> FormTemplates { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
