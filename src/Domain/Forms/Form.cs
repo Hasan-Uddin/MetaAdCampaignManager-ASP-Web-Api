@@ -14,6 +14,7 @@ public sealed class Form : Entity
     public string PrivacyPolicyLinkText { get; set; } = string.Empty;
     public string FollowUpActionUrl { get; set; } = string.Empty;
     public List<FormQuestion> Questions { get; set; } = [];
+    public Guid? TemplateId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime SyncedAt { get; set; }
 }
