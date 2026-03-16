@@ -1,6 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Remove="Features\Meta\Forms\CreateFormFromTemplate\**" />
+    <EmbeddedResource Remove="Features\Meta\Forms\CreateFormFromTemplate\**" />
+    <None Remove="Features\Meta\Forms\CreateFormFromTemplate\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Google.Apis.Auth" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
