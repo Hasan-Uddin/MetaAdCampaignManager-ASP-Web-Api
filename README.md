@@ -380,40 +380,6 @@ Navigate to `https://localhost:5001/swagger` in your browser when running in **D
 
 ### Using curl
 
-#### Register a User
-
-```bash
-curl -X POST https://localhost:5001/users/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "password": "P@ssw0rd123"
-  }'
-```
-
-**Response** `200 OK`:
-```json
-"3fa85f64-5717-4562-b3fc-2c963f66afa6"
-```
-
-#### Login
-
-```bash
-curl -X POST https://localhost:5001/users/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "P@ssw0rd123"
-  }'
-```
-
-**Response** `200 OK`:
-```json
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
 #### Get Current User (Authenticated)
 
 ```bash
