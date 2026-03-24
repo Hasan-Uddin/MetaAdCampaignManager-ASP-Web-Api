@@ -8,6 +8,7 @@ using Application.Features.Meta.Campaigns.Get;
 using Application.Features.Meta.Forms;
 using Application.Features.Meta.Forms.Create;
 using Application.Features.Meta.Leads.Get;
+using Application.Features.Meta.Leads.GetStructuredLeads;
 using Infrastructure.Services.Meta.DTOs;
 using Infrastructure.Services.Meta.Settings;
 using Microsoft.Extensions.Logging;
@@ -161,6 +162,55 @@ public sealed class MetaApiService(
         {
             logger.LogWarning(ex, "Failed to fetch leads from Meta for form {FormId}", formId);
             return Result.Failure<List<LeadResponse>>(Error.Failure("Meta.Unavailable", ex.Message));
+        }
+    }
+
+
+    public async Task<Result<List<StructuredLeadResponse>>> GetStructuredLeadsAsync(string formId, CancellationToken ct = default)
+    {
+        Result<MetaSettingsSnapshot> s = await settingsProvider.GetAsync(ct);
+        if (s.IsFailure)
+        {
+            return Result.Failure<List<StructuredLeadResponse>>(s.Error);
+        }
+
+        try
+        {
+            string url = $"{formId}/leads?fields=id,ad_id,campaign_id,adset_id,created_time,field_data&access_token={s.Value.PageAccessToken}";
+            MetaPaginatedResponse<MetaLead>? response = await httpClient.GetFromJsonAsync<MetaPaginatedResponse<MetaLead>>(url, ct);
+
+            return response?.Data.Select(l =>
+            {
+                Dictionary<string, string> dict = l.FieldData?.ToDictionary(f => f.Name, f => string.Join(",", f.Values)) ?? [];
+
+                return new StructuredLeadResponse
+                {
+                    Id = l.Id,
+                    FormId = formId,
+                    AdId = l.AdId ?? string.Empty,
+                    CampaignId = l.CampaignId ?? string.Empty,
+                    AdSetId = l.AdSetId ?? string.Empty,
+                    CreatedAt = l.CreatedTime.UtcDateTime,
+                    FieldData = new LeadFieldDataResponse
+                    {
+                        FirstName = dict.GetValueOrDefault("first_name"),
+                        LastName = dict.GetValueOrDefault("last_name"),
+                        Email = dict.GetValueOrDefault("email"),
+                        Country = dict.GetValueOrDefault("country"),
+                        Phone = dict.GetValueOrDefault("phone_number"),
+                        Extra = dict
+                            .Where(kv => kv.Key is not (
+                                "first_name" or "last_name" or "email" or
+                                "country" or "phone_number"))
+                            .ToDictionary(kv => kv.Key, kv => kv.Value)
+                    }
+                };
+            }).ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to fetch leads from Meta for form {FormId}", formId);
+            return Result.Failure<List<StructuredLeadResponse>>(Error.Failure("Meta.Unavailable", ex.Message));
         }
     }
 
