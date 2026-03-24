@@ -28,6 +28,7 @@ public sealed class ApplicationDbContext(
     public DbSet<MetaSetting> MetaSettings { get; set; }
     public DbSet<FormQuestion> FormQuestions { get; set; }
     public DbSet<FormTemplate> FormTemplates { get; set; }
+    public DbSet<StructuredLead> StructuredLeads { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

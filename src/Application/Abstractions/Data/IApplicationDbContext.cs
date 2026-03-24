@@ -22,5 +22,6 @@ public interface IApplicationDbContext
     DbSet<MetaSetting> MetaSettings { get; }
     DbSet<FormQuestion> FormQuestions { get; }
     DbSet<FormTemplate> FormTemplates { get; }
+    DbSet<StructuredLead> StructuredLeads { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
