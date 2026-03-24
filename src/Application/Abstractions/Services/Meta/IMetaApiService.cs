@@ -4,6 +4,7 @@ using Application.Features.Meta.Campaigns.Get;
 using Application.Features.Meta.Forms;
 using Application.Features.Meta.Forms.Create;
 using Application.Features.Meta.Leads.Get;
+using Application.Features.Meta.Leads.GetStructuredLeads;
 using SharedKernel;
 
 namespace Application.Abstractions.Services.Meta;
@@ -18,4 +19,5 @@ public interface IMetaApiService
     Task<Result<string>> CreateFormAsync(CreateFormCommand command, CancellationToken ct = default);
     Task<Result<FormResponse>> GetFormByIdAsync(string formId, CancellationToken ct = default);
     Task<Result> DeleteFormAsync(string formId, CancellationToken ct = default);
+    Task<Result<List<StructuredLeadResponse>>> GetStructuredLeadsAsync(string formId, CancellationToken ct = default);
 }
