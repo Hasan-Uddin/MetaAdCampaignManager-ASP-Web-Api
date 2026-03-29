@@ -15,7 +15,7 @@ internal sealed class MetaAuthService(
 {
     private readonly MetaApiOptions _option = options.Value;
     private readonly string BaseUrl = options.Value.BaseUrl;
-    private const string Scopes = "pages_manage_ads,pages_read_engagement,leads_retrieval,ads_management";
+    private const string Scopes = "pages_manage_ads,pages_read_engagement,leads_retrieval,ads_management,business_management,whatsapp_business_management,whatsapp_business_messaging";
 
     public Uri GetLoginUrl(string redirectUri, string state)
     {
