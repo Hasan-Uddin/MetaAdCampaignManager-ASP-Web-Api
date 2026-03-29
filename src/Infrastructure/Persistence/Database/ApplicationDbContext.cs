@@ -2,12 +2,15 @@
 using Domain.Ads;
 using Domain.AdSets;
 using Domain.Campaigns;
+using Domain.Conversations;
 using Domain.FormQuestions;
 using Domain.Forms;
 using Domain.FormTemplates;
 using Domain.Leads;
+using Domain.Messages;
 using Domain.MetaSettings;
 using Domain.Users;
+using Domain.WhatsApp;
 using Infrastructure.Persistence.DomainEvents;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -28,6 +31,9 @@ public sealed class ApplicationDbContext(
     public DbSet<MetaSetting> MetaSettings { get; set; }
     public DbSet<FormQuestion> FormQuestions { get; set; }
     public DbSet<FormTemplate> FormTemplates { get; set; }
+    public DbSet<WhatsAppSetting> WhatsAppSettings { get; set; }
+    public DbSet<Conversation> Conversations { get; set; }
+    public DbSet<Message> Messages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
