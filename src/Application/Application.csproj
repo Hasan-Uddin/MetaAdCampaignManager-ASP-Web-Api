@@ -24,4 +24,8 @@
 	<InternalsVisibleTo Include="Application.UnitTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Features\WhatsApp\GetConversations\" />
+  </ItemGroup>
+
 </Project>
