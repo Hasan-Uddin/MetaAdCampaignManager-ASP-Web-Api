@@ -5,6 +5,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Email;
 using Application.Abstractions.Interfaces;
 using Application.Abstractions.Services.Meta;
+using Application.Abstractions.WhatsApp;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Database;
 using Infrastructure.Persistence.DomainEvents;
@@ -15,6 +16,7 @@ using Infrastructure.Services.Email;
 using Infrastructure.Services.Meta;
 using Infrastructure.Services.Meta.Settings;
 using Infrastructure.Services.Time;
+using Infrastructure.Services.WhatsApp;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -90,6 +92,10 @@ public static class DependencyInjection
         });
         services.AddScoped<IMetaSettingsProvider, MetaSettingsProvider>();
         services.AddHostedService<LeadSyncBackgroundService>();
+
+        //WhatsApp
+        services.AddHttpClient<IWhatsAppService, WhatsAppService>();
+        services.AddScoped<IWhatsAppSettingsProvider, WhatsAppSettingsProvider>();
 
         return services;
     }
