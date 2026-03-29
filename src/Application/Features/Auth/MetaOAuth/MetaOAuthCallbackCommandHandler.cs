@@ -3,8 +3,10 @@ using Application.Abstractions.Authentication.MetaAuth;
 using Application.Abstractions.Data;
 using Application.Abstractions.Interfaces;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.WhatsApp;
 using Domain.MetaSettings;
 using Domain.Users;
+using Domain.WhatsApp;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -15,7 +17,8 @@ internal sealed class MetaOAuthCallbackCommandHandler(
     IDateTimeProvider dateTimeProvider,
     IMetaAuthService metaAuth,
     IUserRepository userRepository,
-    ITokenProvider tokenProvider
+    ITokenProvider tokenProvider,
+    IWhatsAppService whatsAppService
 ) : ICommandHandler<MetaOAuthCallbackCommand, MetaOAuthCallbackCommandResponse>
 {
     public async Task<Result<MetaOAuthCallbackCommandResponse>> Handle(MetaOAuthCallbackCommand command, CancellationToken cancellationToken)
@@ -101,6 +104,55 @@ internal sealed class MetaOAuthCallbackCommandHandler(
         }
 
         await context.SaveChangesAsync(cancellationToken);
+
+        // Fetch WhatsApp Business Account
+        Result<WhatsAppBusinessInfo> wabaResult = await whatsAppService
+            .GetFirstBusinessAccountAsync(longLivedResult.Value.AccessToken, cancellationToken);
+
+        if (wabaResult.IsSuccess)
+        {
+            Result<WhatsAppPhoneNumberInfo> phoneResult = await whatsAppService
+                .GetFirstPhoneNumberAsync(wabaResult.Value.BusinessAccountId, longLivedResult.Value.AccessToken, cancellationToken);
+
+            if (phoneResult.IsSuccess)
+            {
+                WhatsAppSetting? waSetting = await context.WhatsAppSettings
+                    .FirstOrDefaultAsync(x => x.UserId == user.Id, cancellationToken);
+
+                if (waSetting is null)
+                {
+                    waSetting = WhatsAppSetting.Create(
+                        user.Id,
+                        longLivedResult.Value.AccessToken,
+                        wabaResult.Value.BusinessAccountId,
+                        phoneResult.Value.PhoneNumberId,
+                        phoneResult.Value.PhoneNumber,
+                        Guid.NewGuid().ToString(),   // webhook verify token auto-generated
+                        dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds));
+
+                    context.WhatsAppSettings.Add(waSetting);
+                }
+                else
+                {
+                    waSetting.AccessToken = longLivedResult.Value.AccessToken;
+                    waSetting.AccessTokenExpiresAt = dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds);
+                    waSetting.BusinessAccountId = wabaResult.Value.BusinessAccountId;
+                    waSetting.PhoneNumberId = phoneResult.Value.PhoneNumberId;
+                    waSetting.PhoneNumber = phoneResult.Value.PhoneNumber;
+                    waSetting.UpdatedAt = dateTimeProvider.UtcNow;
+                }
+
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                //logger.LogWarning("WhatsApp phone number not found: {Error}", phoneResult.Error.Description);
+            }
+        }
+        else
+        {
+            //logger.LogWarning("WhatsApp Business Account not found: {Error}", wabaResult.Error.Description);
+        }
 
         return Result.Success(new MetaOAuthCallbackCommandResponse(tokenProvider.Create(user), user.Id));
     }
