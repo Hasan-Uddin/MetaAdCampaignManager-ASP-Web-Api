@@ -12,4 +12,5 @@ public static class Tags
     public const string Leads = "Leads";
     public const string MetaSettings = "MetaSettings";
     public const string FormTemplates = "Form-Templates";
+    public const string WhatsApp = "WhatsApp";
 }
