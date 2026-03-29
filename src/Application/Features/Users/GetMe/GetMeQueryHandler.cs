@@ -12,11 +12,7 @@ internal sealed class GetMeQueryHandler(IApplicationDbContext context, IUserCont
 {
     public async Task<Result<UserResponse>> Handle(GetMeQuery query, CancellationToken cancellationToken)
     {
-        Guid? userId = userContext.UserId;
-        if (userId is null)
-        {
-            return Result.Failure<UserResponse>(UserErrors.Unauthorized());
-        }
+        Guid userId = userContext.UserId;
 
         UserResponse? user = await context.Users
             .AsNoTracking()
