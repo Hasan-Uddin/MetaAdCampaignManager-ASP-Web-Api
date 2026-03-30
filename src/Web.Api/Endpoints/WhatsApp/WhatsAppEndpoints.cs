@@ -7,8 +7,10 @@ using Application.Features.WhatsApp.Messages.Get;
 using Application.Features.WhatsApp.Messages.Send;
 using Application.Features.WhatsApp.Webhook;
 using Domain.WhatsApp;
+using Infrastructure.Services.Meta;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -25,15 +27,13 @@ internal sealed class WhatsAppEndpoints : IEndpoint
             [FromQuery(Name = "hub.verify_token")] string? token,
             [FromQuery(Name = "hub.challenge")] string? challenge,
             IUserContext userContext,
+            IOptions<MetaApiOptions> options,
             IApplicationDbContext context,
             CancellationToken ct) =>
         {
-            WhatsAppSetting? settings = await context.WhatsAppSettings
-                .FirstOrDefaultAsync(s => s.UserId == userContext.UserId, ct);
-
-            if (mode == "subscribe" && token == settings?.WebhookVerifyToken)
+            if (mode == "subscribe" && token == options.Value.WebhookVerifyToken)
             {
-                return Results.Ok(challenge);
+                return Results.Text(challenge);
             }
 
             return Results.Unauthorized();

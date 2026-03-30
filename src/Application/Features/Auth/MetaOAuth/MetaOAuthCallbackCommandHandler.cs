@@ -8,6 +8,8 @@ using Domain.MetaSettings;
 using Domain.Users;
 using Domain.WhatsApp;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Serilog;
 using SharedKernel;
 
 namespace Application.Features.Auth.MetaOAuth;
@@ -18,7 +20,8 @@ internal sealed class MetaOAuthCallbackCommandHandler(
     IMetaAuthService metaAuth,
     IUserRepository userRepository,
     ITokenProvider tokenProvider,
-    IWhatsAppService whatsAppService
+    IWhatsAppService whatsAppService,
+    ILogger<MetaOAuthCallbackCommandHandler> logger
 ) : ICommandHandler<MetaOAuthCallbackCommand, MetaOAuthCallbackCommandResponse>
 {
     public async Task<Result<MetaOAuthCallbackCommandResponse>> Handle(MetaOAuthCallbackCommand command, CancellationToken cancellationToken)
@@ -127,7 +130,6 @@ internal sealed class MetaOAuthCallbackCommandHandler(
                         wabaResult.Value.BusinessAccountId,
                         phoneResult.Value.PhoneNumberId,
                         phoneResult.Value.PhoneNumber,
-                        Guid.NewGuid().ToString(),   // webhook verify token auto-generated
                         dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds));
 
                     context.WhatsAppSettings.Add(waSetting);
@@ -146,12 +148,12 @@ internal sealed class MetaOAuthCallbackCommandHandler(
             }
             else
             {
-                //logger.LogWarning("WhatsApp phone number not found: {Error}", phoneResult.Error.Description);
+                logger.LogWarning("WhatsApp phone number not found: {Error}", phoneResult.Error.Description);
             }
         }
         else
         {
-            //logger.LogWarning("WhatsApp Business Account not found: {Error}", wabaResult.Error.Description);
+            logger.LogWarning("WhatsApp Business Account not found: {Error}", wabaResult.Error.Description);
         }
 
         return Result.Success(new MetaOAuthCallbackCommandResponse(tokenProvider.Create(user), user.Id));
