@@ -48,7 +48,7 @@ internal sealed class WhatsAppService(
     {
         try
         {
-            // Step 1 — get businesses the user owns
+            // get businesses the user owns
             string url = $"{BaseUrl}me/businesses?fields=id,name&access_token={accessToken}";
             MetaPaginatedResponse<BusinessResponse>? response =
                 await httpClient.GetFromJsonAsync<MetaPaginatedResponse<BusinessResponse>>(url, ct);
@@ -60,7 +60,7 @@ internal sealed class WhatsAppService(
                     Error.Failure("WhatsApp.NoBusiness", "No business account found."));
             }
 
-            // Step 2 — get WABA owned by that business
+            // get WABA owned by that business
             string wabaUrl = $"{BaseUrl}{business.Id}/owned_whatsapp_business_accounts?fields=id,name&access_token={accessToken}";
             MetaPaginatedResponse<WabaResponse>? wabaResponse =
                 await httpClient.GetFromJsonAsync<MetaPaginatedResponse<WabaResponse>>(wabaUrl, ct);
