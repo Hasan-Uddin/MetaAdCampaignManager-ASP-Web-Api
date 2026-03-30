@@ -11,7 +11,6 @@ public sealed class WhatsAppSetting : Entity
     public string BusinessAccountId { get; set; } = string.Empty;
     public string PhoneNumberId { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
-    public string WebhookVerifyToken { get; set; } = string.Empty;
     public DateTime AccessTokenExpiresAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public User User { get; set; } = null!;
@@ -22,7 +21,6 @@ public sealed class WhatsAppSetting : Entity
         string businessAccountId,
         string phoneNumberId,
         string phoneNumber,
-        string webhookVerifyToken,
         DateTime expiresAt)
     {
         return new WhatsAppSetting
@@ -33,7 +31,6 @@ public sealed class WhatsAppSetting : Entity
             BusinessAccountId = businessAccountId,
             PhoneNumberId = phoneNumberId,
             PhoneNumber = phoneNumber,
-            WebhookVerifyToken = webhookVerifyToken,
             AccessTokenExpiresAt = expiresAt,
             UpdatedAt = DateTime.UtcNow
         };
