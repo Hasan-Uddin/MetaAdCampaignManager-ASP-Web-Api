@@ -11,6 +11,7 @@ using Domain.Messages;
 using Domain.MetaSettings;
 using Domain.Users;
 using Domain.WhatsApp;
+using Domain.WhatsAppCall;
 using Infrastructure.Persistence.DomainEvents;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -34,6 +35,7 @@ public sealed class ApplicationDbContext(
     public DbSet<WhatsAppSetting> WhatsAppSettings { get; set; }
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
+    public DbSet<WhatsAppCallConfig> WhatsAppCallConfigs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

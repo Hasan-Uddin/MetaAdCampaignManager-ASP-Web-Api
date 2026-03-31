@@ -10,6 +10,7 @@ using Domain.Messages;
 using Domain.MetaSettings;
 using Domain.Users;
 using Domain.WhatsApp;
+using Domain.WhatsAppCall;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Abstractions.Data;
@@ -28,5 +29,6 @@ public interface IApplicationDbContext
     DbSet<WhatsAppSetting> WhatsAppSettings { get; }
     DbSet<Conversation> Conversations { get; }
     DbSet<Message> Messages { get; }
+    DbSet<WhatsAppCallConfig> WhatsAppCallConfigs { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
