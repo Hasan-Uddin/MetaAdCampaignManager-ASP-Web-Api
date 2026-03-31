@@ -7,9 +7,9 @@ using Application.Abstractions.WhatsApp;
 using Domain.MetaSettings;
 using Domain.Users;
 using Domain.WhatsApp;
+using Domain.WhatsAppCall;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Serilog;
 using SharedKernel;
 
 namespace Application.Features.Auth.MetaOAuth;
@@ -21,48 +21,84 @@ internal sealed class MetaOAuthCallbackCommandHandler(
     IUserRepository userRepository,
     ITokenProvider tokenProvider,
     IWhatsAppService whatsAppService,
+    IWhatsAppCallingService callingService,
     ILogger<MetaOAuthCallbackCommandHandler> logger
 ) : ICommandHandler<MetaOAuthCallbackCommand, MetaOAuthCallbackCommandResponse>
 {
-    public async Task<Result<MetaOAuthCallbackCommandResponse>> Handle(MetaOAuthCallbackCommand command, CancellationToken cancellationToken)
+    public async Task<Result<MetaOAuthCallbackCommandResponse>> Handle(
+        MetaOAuthCallbackCommand command, CancellationToken cancellationToken)
     {
-        // Exchange code → long-lived access token
-        Result<TokenResult> tokenResult = await metaAuth.ExchangeCodeAsync(
-            command.Code, command.RedirectUri, cancellationToken);
-        if (tokenResult.IsFailure)
-        {
-            return Result.Failure<MetaOAuthCallbackCommandResponse>(tokenResult.Error);
-        }
-
-        Result<TokenResult> longLivedResult = await metaAuth.ExchangeLongLivedTokenAsync(tokenResult.Value.AccessToken, cancellationToken);
+        // 1. Exchange code → long-lived token
+        Result<TokenResult> longLivedResult = await ExchangeTokensAsync(command, cancellationToken);
         if (longLivedResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(longLivedResult.Error);
         }
 
-        // Fetch page info + ad account
-        Result<MetaPageInfo> pageInfoResult = await metaAuth.GetFirstPageAsync(longLivedResult.Value.AccessToken, cancellationToken);
+        // 2. Fetch Meta data
+        Result<MetaPageInfo> pageInfoResult = await metaAuth.GetFirstPageAsync(
+            longLivedResult.Value.AccessToken, cancellationToken);
         if (pageInfoResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(pageInfoResult.Error);
         }
 
-        Result<string> adAccountResult = await metaAuth.GetFirstAdAccountIdAsync(longLivedResult.Value.AccessToken, cancellationToken);
+        Result<string> adAccountResult = await metaAuth.GetFirstAdAccountIdAsync(
+            longLivedResult.Value.AccessToken, cancellationToken);
         if (adAccountResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(adAccountResult.Error);
         }
 
-        // Fetch Meta user info
-        Result<MetaUserInfo> metaUserResult = await metaAuth.GetUserInfoAsync(longLivedResult.Value.AccessToken, cancellationToken);
+        Result<MetaUserInfo> metaUserResult = await metaAuth.GetUserInfoAsync(
+            longLivedResult.Value.AccessToken, cancellationToken);
         if (metaUserResult.IsFailure)
         {
             return Result.Failure<MetaOAuthCallbackCommandResponse>(metaUserResult.Error);
         }
 
-        MetaUserInfo metaUser = metaUserResult.Value;
+        // 3. Create/update user
+        User user = await UpsertUserAsync(metaUserResult.Value);
 
-        // Create/update User
+        // 4. Save Meta settings
+        await UpsertMetaSettingsAsync(
+            user.Id,
+            longLivedResult.Value,
+            pageInfoResult.Value,
+            adAccountResult.Value,
+            cancellationToken);
+
+        // 5. Save WhatsApp settings — non-blocking
+        WhatsAppSetting? whatsAppSetting = await TryUpsertWhatsAppSettingsAsync(
+            user.Id, longLivedResult.Value, cancellationToken);
+
+        // 6. Save call config — non-blocking
+        if (whatsAppSetting is not null)
+        {
+            await TryUpsertCallConfigAsync(
+                user.Id, whatsAppSetting, longLivedResult.Value.AccessToken, cancellationToken);
+        }
+
+        return Result.Success(new MetaOAuthCallbackCommandResponse(tokenProvider.Create(user), user.Id));
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private async Task<Result<TokenResult>> ExchangeTokensAsync(
+        MetaOAuthCallbackCommand command, CancellationToken ct)
+    {
+        Result<TokenResult> shortLived = await metaAuth.ExchangeCodeAsync(
+            command.Code, command.RedirectUri, ct);
+        if (shortLived.IsFailure)
+        {
+            return Result.Failure<TokenResult>(shortLived.Error);
+        }
+
+        return await metaAuth.ExchangeLongLivedTokenAsync(shortLived.Value.AccessToken, ct);
+    }
+
+    private async Task<User> UpsertUserAsync(MetaUserInfo metaUser)
+    {
         User? user = metaUser.Email is not null
             ? await userRepository.GetByEmailAsync(metaUser.Email)
             : await userRepository.GetByFacebookIdAsync(metaUser.Id);
@@ -78,84 +114,133 @@ internal sealed class MetaOAuthCallbackCommandHandler(
         }
 
         await userRepository.SaveChangesAsync();
+        return user;
+    }
 
-        // Create/update singleton MetaSettings row
+    private async Task UpsertMetaSettingsAsync(
+        Guid userId,
+        TokenResult token,
+        MetaPageInfo pageInfo,
+        string adAccountId,
+        CancellationToken ct)
+    {
         MetaSetting? settings = await context.MetaSettings
-            .FirstOrDefaultAsync(x => x.UserId == user.Id, cancellationToken);
+            .FirstOrDefaultAsync(x => x.UserId == userId, ct);
 
         if (settings is null)
         {
             settings = MetaSetting.Create(
-                user.Id,
-                longLivedResult.Value.AccessToken,
-                pageInfoResult.Value.PageId,
-                adAccountResult.Value,
-                pageInfoResult.Value.PageAccessToken,
-                dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds)
-            );
+                userId,
+                token.AccessToken,
+                pageInfo.PageId,
+                adAccountId,
+                pageInfo.PageAccessToken,
+                dateTimeProvider.UtcNow.AddSeconds(token.ExpiresInSeconds));
 
             context.MetaSettings.Add(settings);
         }
         else
         {
-            settings.AccessToken = longLivedResult.Value.AccessToken;
-            settings.AccessTokenExpiresAt = dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds);
-            settings.PageId = pageInfoResult.Value.PageId;
-            settings.PageAccessToken = pageInfoResult.Value.PageAccessToken;
-            settings.AdAccountId = adAccountResult.Value;
+            settings.AccessToken = token.AccessToken;
+            settings.AccessTokenExpiresAt = dateTimeProvider.UtcNow.AddSeconds(token.ExpiresInSeconds);
+            settings.PageId = pageInfo.PageId;
+            settings.PageAccessToken = pageInfo.PageAccessToken;
+            settings.AdAccountId = adAccountId;
             settings.UpdatedAt = dateTimeProvider.UtcNow;
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(ct);
+    }
 
-        // Fetch WhatsApp Business Account
+    private async Task<WhatsAppSetting?> TryUpsertWhatsAppSettingsAsync(
+        Guid userId, TokenResult token, CancellationToken ct)
+    {
         Result<WhatsAppBusinessInfo> wabaResult = await whatsAppService
-            .GetFirstBusinessAccountAsync(longLivedResult.Value.AccessToken, cancellationToken);
+            .GetFirstBusinessAccountAsync(token.AccessToken, ct);
 
-        if (wabaResult.IsSuccess)
+        if (wabaResult.IsFailure)
         {
-            Result<WhatsAppPhoneNumberInfo> phoneResult = await whatsAppService
-                .GetFirstPhoneNumberAsync(wabaResult.Value.BusinessAccountId, longLivedResult.Value.AccessToken, cancellationToken);
+            logger.LogWarning("WhatsApp Business Account not found: {Error}", wabaResult.Error.Description);
+            return null;
+        }
 
-            if (phoneResult.IsSuccess)
-            {
-                WhatsAppSetting? waSetting = await context.WhatsAppSettings
-                    .FirstOrDefaultAsync(x => x.UserId == user.Id, cancellationToken);
+        Result<WhatsAppPhoneNumberInfo> phoneResult = await whatsAppService
+            .GetFirstPhoneNumberAsync(wabaResult.Value.BusinessAccountId, token.AccessToken, ct);
 
-                if (waSetting is null)
-                {
-                    waSetting = WhatsAppSetting.Create(
-                        user.Id,
-                        longLivedResult.Value.AccessToken,
-                        wabaResult.Value.BusinessAccountId,
-                        phoneResult.Value.PhoneNumberId,
-                        phoneResult.Value.PhoneNumber,
-                        dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds));
+        if (phoneResult.IsFailure)
+        {
+            logger.LogWarning("WhatsApp phone number not found: {Error}", phoneResult.Error.Description);
+            return null;
+        }
 
-                    context.WhatsAppSettings.Add(waSetting);
-                }
-                else
-                {
-                    waSetting.AccessToken = longLivedResult.Value.AccessToken;
-                    waSetting.AccessTokenExpiresAt = dateTimeProvider.UtcNow.AddSeconds(longLivedResult.Value.ExpiresInSeconds);
-                    waSetting.BusinessAccountId = wabaResult.Value.BusinessAccountId;
-                    waSetting.PhoneNumberId = phoneResult.Value.PhoneNumberId;
-                    waSetting.PhoneNumber = phoneResult.Value.PhoneNumber;
-                    waSetting.UpdatedAt = dateTimeProvider.UtcNow;
-                }
+        WhatsAppSetting? waSetting = await context.WhatsAppSettings
+            .FirstOrDefaultAsync(x => x.UserId == userId, ct);
 
-                await context.SaveChangesAsync(cancellationToken);
-            }
-            else
-            {
-                logger.LogWarning("WhatsApp phone number not found: {Error}", phoneResult.Error.Description);
-            }
+        if (waSetting is null)
+        {
+            waSetting = WhatsAppSetting.Create(
+                userId,
+                token.AccessToken,
+                wabaResult.Value.BusinessAccountId,
+                phoneResult.Value.PhoneNumberId,
+                phoneResult.Value.PhoneNumber,
+                dateTimeProvider.UtcNow.AddSeconds(token.ExpiresInSeconds));
+
+            context.WhatsAppSettings.Add(waSetting);
         }
         else
         {
-            logger.LogWarning("WhatsApp Business Account not found: {Error}", wabaResult.Error.Description);
+            waSetting.AccessToken = token.AccessToken;
+            waSetting.AccessTokenExpiresAt = dateTimeProvider.UtcNow.AddSeconds(token.ExpiresInSeconds);
+            waSetting.BusinessAccountId = wabaResult.Value.BusinessAccountId;
+            waSetting.PhoneNumberId = phoneResult.Value.PhoneNumberId;
+            waSetting.PhoneNumber = phoneResult.Value.PhoneNumber;
+            waSetting.UpdatedAt = dateTimeProvider.UtcNow;
         }
 
-        return Result.Success(new MetaOAuthCallbackCommandResponse(tokenProvider.Create(user), user.Id));
+        await context.SaveChangesAsync(ct);
+        return waSetting;
+    }
+
+    private async Task TryUpsertCallConfigAsync(
+        Guid userId, WhatsAppSetting waSetting, string accessToken, CancellationToken ct)
+    {
+        Result<WhatsAppCallConfigSnapshot> callConfigResult = await callingService
+            .GetCallSettingsAsync(waSetting.PhoneNumberId, accessToken, ct);
+
+        if (callConfigResult.IsFailure)
+        {
+            logger.LogWarning("Failed to fetch WhatsApp call config: {Error}", callConfigResult.Error.Description);
+            return;
+        }
+
+        WhatsAppCallConfig? callConfig = await context.WhatsAppCallConfigs
+            .FirstOrDefaultAsync(c => c.UserId == userId, ct);
+
+        if (callConfig is null)
+        {
+            callConfig = new WhatsAppCallConfig
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                PhoneNumberId = waSetting.PhoneNumberId,
+                CallingEnabled = callConfigResult.Value.CallingEnabled,
+                InboundCallsEnabled = callConfigResult.Value.InboundCallsEnabled,
+                CallbackRequestsEnabled = callConfigResult.Value.CallbackRequestsEnabled,
+                CallHoursMode = Enum.Parse<CallHoursMode>(callConfigResult.Value.CallHoursMode, ignoreCase: true),
+                UpdatedAt = dateTimeProvider.UtcNow
+            };
+            context.WhatsAppCallConfigs.Add(callConfig);
+        }
+        else
+        {
+            callConfig.CallingEnabled = callConfigResult.Value.CallingEnabled;
+            callConfig.InboundCallsEnabled = callConfigResult.Value.InboundCallsEnabled;
+            callConfig.CallbackRequestsEnabled = callConfigResult.Value.CallbackRequestsEnabled;
+            callConfig.CallHoursMode = Enum.Parse<CallHoursMode>(callConfigResult.Value.CallHoursMode, ignoreCase: true);
+            callConfig.UpdatedAt = dateTimeProvider.UtcNow;
+        }
+
+        await context.SaveChangesAsync(ct);
     }
 }
