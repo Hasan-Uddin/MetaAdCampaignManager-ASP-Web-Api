@@ -1,15 +1,15 @@
 ﻿using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Features.WhatsApp.CallConfig.Get;
+using Application.Features.WhatsApp.CallConfig.Update;
 using Application.Features.WhatsApp.Conversations.Create;
 using Application.Features.WhatsApp.Conversations.Get;
 using Application.Features.WhatsApp.Messages.Get;
 using Application.Features.WhatsApp.Messages.Send;
 using Application.Features.WhatsApp.Webhook;
-using Domain.WhatsApp;
 using Infrastructure.Services.Meta;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -96,6 +96,35 @@ internal sealed class WhatsAppEndpoints : IEndpoint
         {
             Result result = await handler.Handle(
                 new SendMessageCommand(userContext.UserId, conversationId, request.Body), ct);
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        }).WithTags(Tags.WhatsApp).RequireAuthorization();
+
+        // Get call config
+        app.MapGet("whatsapp/call-config", async (
+            IUserContext userContext,
+            IQueryHandler<GetCallConfigQuery, CallConfigResponse> handler,
+            CancellationToken ct) =>
+        {
+            Result<CallConfigResponse> result = await handler.Handle(new GetCallConfigQuery(userContext.UserId), ct);
+            return result.Match(Results.Ok, CustomResults.Problem);
+        }).WithTags(Tags.WhatsApp).RequireAuthorization();
+
+        // Update call config
+        app.MapPut("whatsapp/call-config", async (
+            UpdateCallConfigRequest request,
+            IUserContext userContext,
+            ICommandHandler<UpdateCallConfigCommand> handler,
+            CancellationToken ct) =>
+        {
+            var command = new UpdateCallConfigCommand(
+                userContext.UserId,
+                request.CallingEnabled,
+                request.InboundCallsEnabled,
+                request.CallbackRequestsEnabled,
+                request.CallHoursMode,
+                request.BusinessHours);
+
+            Result result = await handler.Handle(command, ct);
             return result.Match(Results.NoContent, CustomResults.Problem);
         }).WithTags(Tags.WhatsApp).RequireAuthorization();
     }
