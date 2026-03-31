@@ -96,6 +96,7 @@ public static class DependencyInjection
         //WhatsApp
         services.AddHttpClient<IWhatsAppService, WhatsAppService>();
         services.AddScoped<IWhatsAppSettingsProvider, WhatsAppSettingsProvider>();
+        services.AddHttpClient<IWhatsAppCallingService, WhatsAppCallingService>();
 
         return services;
     }
